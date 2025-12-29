@@ -1,0 +1,26 @@
+{
+  "years": [
+    "2016",
+    "2017",
+    "2018",
+    "2019",
+    "2020"
+  ],
+  "train_samples": {
+    "benign": 38239,
+    "malignant": 8601,
+    "total": 46840
+  },
+  "val_samples": {
+    "benign": 9561,
+    "malignant": 1775,
+    "total": 11336
+  },
+  "test_samples": {
+    "benign": 15067,
+    "malignant": 2058,
+    "total": 17125
+  },
+  "missing_train_files": 13689,
+  "missing_test_files": 1493
+}

@@ -1,0 +1,6 @@
+vit_tiny_patch16_224
+
+vit_small_patch14_reg4_dinov2
+
+swinv2_tiny_window16_256
+
