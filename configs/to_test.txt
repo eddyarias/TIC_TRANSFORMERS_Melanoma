@@ -4,3 +4,7 @@ vit_small_patch14_reg4_dinov2
 
 swinv2_tiny_window16_256
 
+
+vit_base_patch14_reg4_dinov2
+vit_large_patch14_reg4_dinov2
+vit_giant_patch14_reg4_dinov2

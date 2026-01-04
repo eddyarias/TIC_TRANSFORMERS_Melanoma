@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 import argparse
+import re
 import torch
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
@@ -59,18 +60,29 @@ def main(config_path: str):
     os.makedirs(run_dir, exist_ok=True)
     writer = SummaryWriter(run_dir)
 
-    # Optional: load initial weights if provided
+    # Optional: load initial weights if provided and configure resume behavior
     skip_phase1 = False
+    resume_global_epoch = None  # global epoch index used in filenames
     if cfg['training'].get('resume_checkpoint'):
         resume_path = cfg['training']['resume_checkpoint']
         if os.path.exists(resume_path):
             print(f"Info: Loading checkpoint weights from {resume_path}")
             load_weights(model, resume_path)
-            # If the checkpoint name suggests phase 2, skip phase 1 training
             base_name = os.path.basename(resume_path)
-            if 'phase2' in base_name:
-                skip_phase1 = True
-                print('Info: Detected phase2 checkpoint — skipping Phase 1 head training.')
+            # Parse global epoch number from filename pattern: phase1_epoch_{N}.pth or phase2_epoch_{N}.pth
+            m = re.search(r"phase(\d+)_epoch_(\d+)\.pth", base_name)
+            if m:
+                phase_id = int(m.group(1))
+                resume_global_epoch = int(m.group(2))
+                print(f"Info: Resuming from phase {phase_id}, global epoch {resume_global_epoch}.")
+                if phase_id == 2:
+                    skip_phase1 = True
+                    print('Info: Detected phase2 checkpoint — skipping Phase 1 head training.')
+            else:
+                # Fallback: if name contains 'phase2' but no epoch number extracted
+                if 'phase2' in base_name:
+                    skip_phase1 = True
+                    print('Info: Detected phase2 checkpoint — skipping Phase 1 head training.')
         else:
             print(f"Warning: resume_checkpoint path not found: {resume_path}")
 
@@ -112,9 +124,24 @@ def main(config_path: str):
         lr=float(cfg['optimizer']['lr_finetune']),
         weight_decay=float(cfg['optimizer']['weight_decay'])
     )
-    scheduler = CosineAnnealingLR(optimizer, T_max=max(1, int(cfg['training']['epochs_phase2']))) if cfg['scheduler']['type'] == 'cosine' else None
+    # Determine phase 2 starting global epoch when resuming
+    phase1_epochs = int(cfg['training']['epochs_phase1'])
+    phase2_epochs = int(cfg['training']['epochs_phase2'])
+    if resume_global_epoch is not None and skip_phase1:
+        # Start from the next epoch after the checkpoint
+        phase2_start_global_epoch = resume_global_epoch + 1
+        # Clamp to at least the first phase2 global epoch
+        phase2_start_global_epoch = max(phase1_epochs, phase2_start_global_epoch)
+        remaining_phase2 = (phase1_epochs + phase2_epochs) - phase2_start_global_epoch
+        print(f"Info: Phase 2 will resume at global epoch {phase2_start_global_epoch} with {remaining_phase2} epochs remaining.")
+    else:
+        phase2_start_global_epoch = phase1_epochs
+        remaining_phase2 = phase2_epochs
 
-    for epoch in range(int(cfg['training']['epochs_phase1']), int(cfg['training']['epochs_phase1']) + int(cfg['training']['epochs_phase2'])):
+    # Adjust scheduler length to remaining fine-tune epochs if resuming
+    scheduler = CosineAnnealingLR(optimizer, T_max=max(1, int(remaining_phase2))) if cfg['scheduler']['type'] == 'cosine' else None
+
+    for epoch in range(phase2_start_global_epoch, phase1_epochs + phase2_epochs):
         phase2_epoch = epoch - int(cfg['training']['epochs_phase1']) + 1
         print(f"\n=== Phase 2 (Fine-tuning) — Epoch {phase2_epoch}/{int(cfg['training']['epochs_phase2'])} ===")
         train_loss, train_metrics = train_one_epoch(model, train_loader, optimizer, scaler, loss_fn, device, desc=f"Phase2-Train E{phase2_epoch}", accum_steps=int(cfg['training'].get('gradient_accumulation_steps', 1)))

@@ -3,7 +3,7 @@ dataset:
   val_list: lists/validation.txt
   test_list: lists/test.txt
   label_mapping: lists/label_mapping.json
-  image_size: 512
+  image_size: 256
   num_classes: 2
   mean: [0.485, 0.456, 0.406]
   std: [0.229, 0.224, 0.225]
@@ -39,7 +39,7 @@ augmentations:
     center_crop: false
 
 model:
-  backbone: convnext_large  # vit*, swin*, swin_v2*, dinov2*
+  backbone: swinv2_tiny_window8_256  # vit*, swin*, swin_v2*, dinov2*
   pretrained: true
   head:
     hidden_dims: [1024, 256, 64, 16]
@@ -58,7 +58,7 @@ scheduler:
 
 training:
   epochs_phase1: 20
-  epochs_phase2: 40
+  epochs_phase2: 30
   mixed_precision: true
   gradient_accumulation_steps: 2
   seed: 42
@@ -68,7 +68,7 @@ training:
   precomputed_class_weights: [0.61246371505531, 2.7229391931170794]
 
 logging:
-  output_dir: outputs_pth/fase4/convnext_large
+  output_dir: outputs_pth/fase2/swinv2_tiny_window8_256
   tensorboard_dir: logs/tensorboard
   checkpoint_dir: checkpoints
   save_every_epoch: true
